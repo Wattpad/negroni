@@ -22,26 +22,42 @@ type ResponseWriter interface {
 	// Before allows for a function to be called before the ResponseWriter has been written to. This is
 	// useful for setting headers or any other operations that must happen before a response has been written.
 	Before(func(ResponseWriter))
+
+	// Body is the getter for the response body
+	Body() string
+
+	// WriteInternalStatus writes the internal status code
+	WriteInternalStatus(s int)
+
+	// InternalStatus retrieves the internal status code
+	InternalStatus() int
 }
 
 type beforeFunc func(ResponseWriter)
 
 // NewResponseWriter creates a ResponseWriter that wraps an http.ResponseWriter
 func NewResponseWriter(rw http.ResponseWriter) ResponseWriter {
-	return &responseWriter{rw, 0, 0, nil}
+	return &responseWriter{rw, 0, 0, nil, nil, 0}
 }
 
 type responseWriter struct {
 	http.ResponseWriter
-	status      int
-	size        int
-	beforeFuncs []beforeFunc
+	status      	int
+	size        	int
+	beforeFuncs 	[]beforeFunc
+
+	body			[]byte
+	internalStatus	int
 }
 
 func (rw *responseWriter) WriteHeader(s int) {
 	rw.status = s
 	rw.callBefore()
 	rw.ResponseWriter.WriteHeader(s)
+}
+
+func (rw *responseWriter) WriteInternalStatus(s int) {
+	rw.internalStatus = s
 }
 
 func (rw *responseWriter) Write(b []byte) (int, error) {
@@ -51,6 +67,7 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	}
 	size, err := rw.ResponseWriter.Write(b)
 	rw.size += size
+	rw.body = b
 	return size, err
 }
 
@@ -60,6 +77,14 @@ func (rw *responseWriter) Status() int {
 
 func (rw *responseWriter) Size() int {
 	return rw.size
+}
+
+func (rw *responseWriter) Body() string {
+	return string(rw.body)
+}
+
+func (rw *responseWriter) InternalStatus() int {
+	return rw.internalStatus
 }
 
 func (rw *responseWriter) Written() bool {
